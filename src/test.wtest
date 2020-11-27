@@ -1,0 +1,240 @@
+import amangas.*
+describe "Tests de among us"{
+	
+	const unaPartida = new Partida(codigo = "WOLLOK2020")
+	const unaPartidaChica = new Partida(codigo = "WOLLOK2020", maximoParticipantes = 2)
+	const unaPartidaArmada = new Partida(codigo = "WOLLOK2020")
+		
+	const jugadorImpostor = new Participante(velocidad = 5, agilidad = 3, estrategia=2, color = "Rojo")
+	const jugadorAsiNomas = new Participante(velocidad = 5, agilidad = 3, estrategia=2, color = "Amarillo")
+	const jugadorPocoTiempo = new Participante(velocidad = 5, agilidad = 3, estrategia=2, tiempoRestante= 1, color = "Azul")
+	const jugadorConspiranoide = new Conspiranoide(velocidad = 5, agilidad = 3, estrategia=2, color = "Violeta")
+	const otroJugadorConspiranoide = new Conspiranoide(velocidad = 5, agilidad = 3, estrategia=2, color = "Negro")
+	const jugadorBromistaBlanco = new Bromista(velocidad = 5, agilidad = 3, estrategia=2, color = "Blanco", amigue=jugadorConspiranoide)
+	const jugadorAliado = new Aliado(velocidad = 5, agilidad = 3, estrategia=2, color = "Verde", amigue=jugadorConspiranoide)
+	
+	const conectarCables = new TareaAgil()
+	const memotest = new TareaMental(dificultad = 5)
+	
+	fixture {
+		unaPartidaArmada.sumar(jugadorImpostor, "WOLLOK2020")
+		unaPartidaArmada.sumar(jugadorAsiNomas, "WOLLOK2020")
+		unaPartidaArmada.sumar(jugadorPocoTiempo, "WOLLOK2020")
+		unaPartidaArmada.sumar(jugadorBromistaBlanco, "WOLLOK2020")
+		unaPartidaArmada.sumar(jugadorAliado, "WOLLOK2020")
+		unaPartidaArmada.sumar(jugadorConspiranoide, "WOLLOK2020")
+		unaPartidaArmada.comenzarPartida()
+		
+		unaPartidaArmada.agregarTarea(conectarCables)
+		unaPartidaArmada.agregarTarea(memotest)
+	}
+	
+	test "Al intentar sumar a participante a partida con código errado, da error y no lo suma" {
+		assert.throwsExceptionLike(new DomainException(message="No se puede sumar a la partida"), {
+			unaPartida.sumar(jugadorImpostor, "OTROCODIGO")
+		})
+		assert.notThat(unaPartida.participantes().contains(jugadorImpostor))
+	}
+	
+	test "Al intentar sumar a participante a partida llena, da error y no lo suma" {
+		unaPartidaChica.sumar(jugadorBromistaBlanco,"WOLLOK2020")
+		unaPartidaChica.sumar(jugadorConspiranoide,"WOLLOK2020")
+		assert.throwsExceptionLike(new DomainException(message="No se puede sumar a la partida"), {
+			unaPartidaChica.sumar(jugadorPocoTiempo, "WOLLOK2020")
+		})
+		assert.notThat(unaPartida.participantes().contains(jugadorPocoTiempo))
+	}
+	
+	test "Al intentar sumar a participante a partida con lugar y código correcto, lo suma" {
+		unaPartida.sumar(jugadorImpostor, "WOLLOK2020")
+		assert.that(unaPartida.participantes().contains(jugadorImpostor))
+	}
+	
+	test "Partida calcula correctamente cantidad de impostores" {
+		assert.equals(1, unaPartidaArmada.participantes().filter({participante => participante.rol().equals(impostor)}).size())
+	}
+	
+	test "Tripulante realiza tarea ágil en tiempo correcto" {
+		jugadorAsiNomas.realizarTarea(conectarCables)		
+		assert.equals(98,jugadorAsiNomas.tiempoRestante())
+	}
+	
+	test "Impostor no insume tiempo en realizar tarea ágil" {
+		jugadorImpostor.realizarTarea(conectarCables)		
+		assert.equals(100,jugadorImpostor.tiempoRestante())
+	}
+	
+	test "Tripulante realiza tarea mental en tiempo correcto" {
+		jugadorAsiNomas.realizarTarea(memotest)		
+		assert.equals(99,jugadorAsiNomas.tiempoRestante())
+	}
+	
+	test "Impostor no insume tiempo en realizar tarea mental" {
+		jugadorImpostor.realizarTarea(memotest)		
+		assert.equals(100,jugadorImpostor.tiempoRestante())
+	}
+	
+	test "Tarea realizada por tripulante queda hecha"{
+		jugadorAsiNomas.realizarTarea(conectarCables)		
+		assert.that(conectarCables.realizada())
+	}
+	
+	test "Tarea realizada por impostor no queda hecha"{
+		jugadorImpostor.realizarTarea(conectarCables)		
+		assert.notThat(conectarCables.realizada())
+	}
+	
+	test "Al intentar hacer tarea sin tiempo restante suficiente, da error y no la hace ni descuenta tiempo" {
+		assert.throwsExceptionLike(new DomainException(message="Se quedó sin tiempo"), {
+			jugadorPocoTiempo.realizarTarea(conectarCables)
+		})
+		assert.notThat(conectarCables.realizada())
+		assert.equals(1,jugadorPocoTiempo.tiempoRestante())
+	}
+	
+	test "Impostor sabotea tarea en tiempo correcto" {
+		jugadorImpostor.sabotearTarea(conectarCables)		
+		assert.equals(90,jugadorImpostor.tiempoRestante())
+	}
+	
+	test "Tripulante gana tiempo al sabotear tarea" {
+		jugadorAsiNomas.sabotearTarea(conectarCables)		
+		assert.equals(120,jugadorAsiNomas.tiempoRestante())
+	}
+	
+	test "Tarea saboteada por tripulante queda hecha" {
+		jugadorBromistaBlanco.realizarTarea(conectarCables)
+		jugadorAsiNomas.sabotearTarea(conectarCables)		
+		assert.that(conectarCables.realizada())
+	}
+	
+	test "Tarea saboteada por impostor no queda hecha" {
+		jugadorBromistaBlanco.realizarTarea(conectarCables)
+		jugadorImpostor.sabotearTarea(conectarCables)		
+		assert.notThat(conectarCables.realizada())
+	}
+	
+	test "Impostor sin tiempo lanza error y no la sabotea ni descuenta tiempo" {
+		jugadorBromistaBlanco.realizarTarea(conectarCables)
+		jugadorImpostor.tiempoRestante(5)
+		assert.throwsExceptionLike(new DomainException(message="Se quedó sin tiempo"), {
+			jugadorImpostor.sabotearTarea(conectarCables)	
+		})
+			
+		assert.equals(5,jugadorImpostor.tiempoRestante())
+		assert.that(conectarCables.realizada())
+	}
+	
+	test "Asesinar insume el tiempo correcto" {
+		jugadorImpostor.asesinar(jugadorAsiNomas)		
+		assert.equals(95,jugadorImpostor.tiempoRestante())
+	}
+	
+	test "Al asesinar a un participante, está muerto" {
+		jugadorImpostor.asesinar(jugadorAsiNomas)		
+		assert.notThat(jugadorAsiNomas.vive())
+	}
+	
+	test "Tripulante no puede asesinar y da error" {
+		assert.throwsExceptionLike(new DomainException(message="No soy asesino!"), {
+			jugadorAsiNomas.asesinar(jugadorConspiranoide)
+		})
+		assert.that(jugadorConspiranoide.vive())
+	}
+	
+	test "Jugadores así nomás votan a otro" {
+		unaPartidaChica.sumar(jugadorImpostor,"WOLLOK2020")
+		unaPartidaChica.sumar(jugadorAsiNomas,"WOLLOK2020")
+		unaPartidaChica.comenzarPartida()
+		unaPartidaChica.hacerVotaciones()
+		assert.equals(1, jugadorImpostor.votos())
+		assert.equals(1, jugadorAsiNomas.votos())
+	}
+	
+	test "Jugador así nomás votan a otro" {
+		unaPartidaChica.sumar(jugadorImpostor,"WOLLOK2020")
+		unaPartidaChica.sumar(jugadorAsiNomas,"WOLLOK2020")
+		unaPartidaChica.comenzarPartida()
+		unaPartidaChica.hacerVotaciones()
+		assert.equals(1, jugadorImpostor.votos())
+		assert.equals(1, jugadorAsiNomas.votos())
+	}
+	
+	test "Jugador bromista vota a amigo"{
+		unaPartida.sumar(jugadorBromistaBlanco,"WOLLOK2020")
+		unaPartida.sumar(jugadorConspiranoide,"WOLLOK2020")
+		unaPartida.sumar(otroJugadorConspiranoide,"WOLLOK2020")
+		unaPartida.comenzarPartida()
+		unaPartida.hacerVotaciones()
+		assert.equals(1, jugadorConspiranoide.votos())
+	}
+	
+	test "Jugador aliado no vota a amigo"{
+		unaPartida.sumar(jugadorAliado,"WOLLOK2020") // no vota conspiranoide
+		unaPartida.sumar(jugadorBromistaBlanco,"WOLLOK2020") // vota conspiranoide
+		unaPartida.sumar(jugadorConspiranoide,"WOLLOK2020") // vota bromista
+		unaPartida.sumar(otroJugadorConspiranoide,"WOLLOK2020")// vota bromista
+		unaPartida.comenzarPartida()
+		unaPartida.hacerVotaciones()
+		assert.equals(1, jugadorConspiranoide.votos())
+	}
+	
+	test "Jugador conspiraonide vota a banco"{
+		unaPartida.sumar(jugadorBromistaBlanco,"WOLLOK2020")
+		unaPartida.sumar(jugadorConspiranoide,"WOLLOK2020")
+		unaPartida.sumar(otroJugadorConspiranoide,"WOLLOK2020")
+		unaPartida.comenzarPartida()
+		unaPartida.hacerVotaciones()
+		assert.equals(2, jugadorBromistaBlanco.votos())
+	}
+	
+	test "Jugador con más votos es expulsado"{
+		unaPartida.sumar(jugadorBromistaBlanco,"WOLLOK2020")
+		unaPartida.sumar(jugadorConspiranoide,"WOLLOK2020")
+		unaPartida.sumar(otroJugadorConspiranoide,"WOLLOK2020")
+		unaPartida.comenzarPartida()
+		unaPartida.realizarReunionDeEmergencia()
+		assert.notThat(unaPartida.participantes().contains(jugadorBromistaBlanco))
+	}
+	
+	test "Votos se reinician"{
+		unaPartida.sumar(jugadorBromistaBlanco,"WOLLOK2020")
+		unaPartida.sumar(jugadorConspiranoide,"WOLLOK2020")
+		unaPartida.sumar(otroJugadorConspiranoide,"WOLLOK2020")
+		unaPartida.comenzarPartida()
+		unaPartida.realizarReunionDeEmergencia()
+		assert.equals(0, unaPartida.participantes().sum({participante=>participante.votos()}))
+	}
+	
+	
+	test "Grado de victoria de tripulantes se calcula correctamente"{
+		jugadorAsiNomas.realizarTarea(conectarCables)		
+		assert.equals(0.5, unaPartidaArmada.victoriaTripulantes())
+	}
+	
+	test "Grado de victoria de impostores se calcula correctamente"{
+		jugadorImpostor.asesinar(jugadorAsiNomas)	
+		assert.equals(1/5, unaPartidaArmada.victoriaImpostores())
+	}
+	
+	test "Tripulantes van ganando"{
+		jugadorAsiNomas.realizarTarea(conectarCables)		
+		jugadorImpostor.asesinar(jugadorAsiNomas)	
+		assert.that(unaPartidaArmada.gananTripulantes())		
+	}
+	
+	test "Tripulantes no van ganando"{
+		jugadorImpostor.asesinar(jugadorAsiNomas)	
+		assert.notThat(unaPartidaArmada.gananTripulantes())
+	}
+	
+	test "Partida no finalizada"{
+		assert.notThat(unaPartidaArmada.partidaTerminada())
+	}
+	
+	test "Partida finalizada"{
+		jugadorAsiNomas.realizarTarea(conectarCables)		
+		jugadorAsiNomas.realizarTarea(memotest)		
+		assert.that(unaPartidaArmada.partidaTerminada())
+	}
+}
